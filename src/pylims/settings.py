@@ -55,7 +55,7 @@ ROOT_URLCONF = 'pylims.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': ['/home/dev/pylims/src/pylims/templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
