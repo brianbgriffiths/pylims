@@ -182,7 +182,10 @@ def load_step(request, step, page=None):
             containerlist.append(outputcontainer)
             response['outputcontainers'].append(outputcontainer)
 
-    cursor.execute("SELECT * FROM velocity.containers vc JOIN velocity.container_config vcc ON vcc.cid = vc.container_type WHERE vc.conid = ANY(%s)",(containerlist,))
+    # cursor.execute("SELECT * FROM velocity.containers vc JOIN velocity.container_config vcc ON vcc.cid = vc.container_type WHERE vc.conid = ANY(%s)",(containerlist,))
+    # response['containers']=json.dumps(cursor.fetchall())
+
+    cursor.execute("SELECT * FROM velocity.containers vc JOIN velocity.container_config vcc ON vcc.cid = vc.container_type WHERE step=%s;",(step,))
     response['containers']=json.dumps(cursor.fetchall())
     
     print('load step data',step_config['stepid'],step_config['step_type'])
@@ -472,7 +475,7 @@ def save_placements(request):
         response_data = {'error': 'Invalid request method', 'message': 'Method not allowed'}
         return JsonResponse(response_data, status=405)
     json_data = json.loads(request.body)
-    print('loaded json',json_data)
+    # print('loaded json',json_data)
 
     step = json_data['step']
 
@@ -481,7 +484,7 @@ def save_placements(request):
 
     response = {}
     temp = {}
-    print('Checking placements')
+    print('Saving placements')
     cursor.execute("SELECT sio.*, vdi.did as input_id, vdi.container as inputcontainer, vdo.did as output_id, vdo.container as outputcontainer, vs.* FROM velocity.step_io sio JOIN velocity.derivatives vdi ON vdi.did=sio.input_derivative JOIN velocity.derivatives vdo ON vdo.did=sio.output_derivative JOIN velocity.samples vs ON vs.smid=vdi.sample WHERE sio.step=%s",(step,))
     temp['io'] = cursor.fetchall()
     response['io'] = json.dumps(temp['io'])
@@ -501,15 +504,18 @@ def save_placements(request):
             containerlist.append(outputcontainer)
             response['outputcontainers'].append(outputcontainer)
 
-    print('fetch containers:', containerlist)
-    cursor.execute("SELECT * FROM velocity.containers vc JOIN velocity.container_config vcc ON vcc.cid = vc.container_type WHERE vc.conid = ANY(%s)",(containerlist,))
-    containers_db = cursor.fetchall()
+    # print('fetch containers:', containerlist)
+    # cursor.execute("SELECT * FROM velocity.containers vc JOIN velocity.container_config vcc ON vcc.cid = vc.container_type WHERE vc.conid = ANY(%s)",(containerlist,))
+    # containers_db = cursor.fetchall()
+    cursor.execute("SELECT * FROM velocity.containers vc JOIN velocity.container_config vcc ON vcc.cid = vc.container_type WHERE step=%s;",(step,))
+    containers_db=cursor.fetchall()
+    
 
     container_dict = {}
     for row in containers_db:
         container_dict[str(row['conid'])]=row
 
-    print('container_dict',container_dict)
+    # print('container_dict',container_dict)
 
     rownames=['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P']
     containers={}
@@ -531,15 +537,18 @@ def save_placements(request):
         containers[container][index]=sample
         placements[container][sample]=[index,index_to_grid(index)]
 
-    print('placements',placements)
+    # print('placements',placements)
+    # print('containers',containers)
 
     for key in containers:
         cursor.execute("UPDATE velocity.containers SET placements=%s WHERE conid=%s;",(json.dumps(containers[key]),key))
-        updates = [(values[0], values[1], did) for did, values in placements[key].items()]
+        updates = [(values[0], values[1], key, did) for did, values in placements[key].items()]
+        # print('updating',key)
+        # print('updates',updates)
         cursor.executemany(
         """
         UPDATE velocity.derivatives 
-        SET placement_index = %s, placement_string = %s 
+        SET placement_index = %s, placement_string = %s, container = %s 
         WHERE did = %s;
         """,
         updates
@@ -553,6 +562,97 @@ def save_placements(request):
     response['status']='success'
     return JsonResponse(response)
 
+def add_container(request):
+    response_code = handlePost(request)
+    if response_code==400:
+        response_data = {'error': 'Invalid JSON data', 'message': str(e)}
+        return JsonResponse(response_data, status=400)
+    elif response_code==405:
+        response_data = {'error': 'Invalid request method', 'message': 'Method not allowed'}
+        return JsonResponse(response_data, status=405)
+    json_data = json.loads(request.body)
+    print('loaded json',json_data)
+
+    response = {}
+    step = json_data['step']
+    ctype = json_data['type']
+
+    conn = psycopg.connect(dbname=pylims.dbname, user=pylims.dbuser, password=pylims.dbpass, host=pylims.dbhost, port=pylims.dbport, row_factory=dict_row)
+    cursor = conn.cursor()
+
+    cursor.execute("INSERT INTO velocity.containers (container_type,step) VALUES (%s, %s) RETURNING conid;",(ctype,step))
+    response['containerid'] = cursor.fetchone()['conid']
+
+    cursor.execute("SELECT * FROM velocity.containers vc JOIN velocity.container_config vcc ON vcc.cid = vc.container_type WHERE vc.conid=%s;",(response['containerid'],))
+    response['container']=json.dumps(cursor.fetchone())
+
+    conn.commit()
+    conn.close()
+    response['status']='success'
+    return JsonResponse(response)
+
+def discard_step(request):
+    response_code = handlePost(request)
+    if response_code==400:
+        response_data = {'error': 'Invalid JSON data', 'message': str(e)}
+        return JsonResponse(response_data, status=400)
+    elif response_code==405:
+        response_data = {'error': 'Invalid request method', 'message': 'Method not allowed'}
+        return JsonResponse(response_data, status=405)
+    json_data = json.loads(request.body)
+    print('loaded json',json_data)
+
+    response = {}
+    step = json_data['step']
+
+    conn = psycopg.connect(dbname=pylims.dbname, user=pylims.dbuser, password=pylims.dbpass, host=pylims.dbhost, port=pylims.dbport, row_factory=dict_row)
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM velocity.steps WHERE stepid=%s;",(step,))
+    step_row = cursor.fetchone()
+
+    if step_row == None:
+        response['status']='error'
+        response['errormsg']='no step with this id'
+        return JsonResponse(response)
+    
+    if step_row['status']>1:
+        response['status']='error'
+        response['errormsg']='step is not in an active state'
+        return JsonResponse(response)
+    
+    cursor.execute("DELETE FROM velocity.steps WHERE stepid=%s;",(step_row['stepid'],))
+
+    conn.commit()
+    conn.close()
+    response['status']='success'
+    return JsonResponse(response)
+
+def delete_container(request):
+    response_code = handlePost(request)
+    if response_code==400:
+        response_data = {'error': 'Invalid JSON data', 'message': str(e)}
+        return JsonResponse(response_data, status=400)
+    elif response_code==405:
+        response_data = {'error': 'Invalid request method', 'message': 'Method not allowed'}
+        return JsonResponse(response_data, status=405)
+    json_data = json.loads(request.body)
+    print('loaded json',json_data)
+
+    response = {}
+    step = json_data['step']
+    conid = json_data['conid']
+
+    conn = psycopg.connect(dbname=pylims.dbname, user=pylims.dbuser, password=pylims.dbpass, host=pylims.dbhost, port=pylims.dbport, row_factory=dict_row)
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM velocity.containers WHERE conid=%s;",(conid,))
+    response['containerid'] = json_data['conid']
+
+    conn.commit()
+    conn.close()
+    response['status']='success'
+    return JsonResponse(response)
 
 urlpatterns=[
    path("steps/begin/", begin_step, name="begin_step"),
@@ -560,5 +660,8 @@ urlpatterns=[
    path('step/<str:step>/<str:page>', load_step, name='load_step'),
    path('step/nextstep/', next_step, name='next_step'),
    path('step/save/', save_step, name='save_step'),
+   path('step/addcontainer/', add_container, name='add_container'),
+   path('step/discard/', discard_step, name='discard_step'),
+   path('step/deletecontainer/', delete_container, name='delete_container'),
    path('step/saveplacements/', save_placements, name='save_placements'),
     ]

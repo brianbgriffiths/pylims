@@ -170,7 +170,7 @@
     details {
         display: block;
         background-color: var(--accent8);
-        width: 200px;
+        width: 300px;
         margin: 5px;
         
         border: solid 1px var(--accent7);
@@ -189,6 +189,10 @@
         width: 100%;
         display: block;
         margin-left: 30px;
+        background-color: var(--gray-lightest);
+    }
+    reqsample:hover {
+        background-color:var(--gray-light);
     }
     assay {
         display: block;
@@ -209,6 +213,9 @@
     }
     .selected-sample {
         background-color:var(--accent3);
+    }
+    .selected-sample:hover {
+        background-color:var(--accent9);
     }
     dragsamplecount {
         display:none;
@@ -241,6 +248,17 @@
     version::before {
         content:'v';
     }
+    sampleassay {
+        display: block;
+        background-color: var(--green-light);
+        padding: 2px 5px;
+        border: solid 1px var(--green-med);
+        border-radius: 3px;
+        font-size: 14px;
+        font-family: courier;
+        color: var(--green-dark);
+        margin-left:30px;
+    }
 </style>
 {% endblock %}
 {% block centercontent %}
@@ -255,11 +273,11 @@
         <br><input type="text"></div>
 </div>
 <div style="display:flex">
-    <div class="center-border">
+    <div class="center-border" style="margin-right:10px;">
         <div>Latest Requisitions: <selectedsamples>0 Selected</selectedsamples></div>
         <div id="requisitions"></div>
     </div>
-    <div class="center-border">
+    <div class="center-border" style="margin-left:10px;">
         <div>Active Assays:</div>
         <div id="active_assays"></div>
     </div>
@@ -328,6 +346,7 @@ class Sample {
 		for (let datum in data) {
 			this[datum] = data[datum];
 		}
+        this.assays=[]
         this.selected=false;
 		this.element = document.createElement('reqsample');
         this.element.textContent=data.sample_name;
@@ -337,13 +356,13 @@ class Sample {
                 const sample_index = selected_samples.indexOf(this.smid)
                 if (this.selected) {
                     if (sample_index==-1) {
-                        selected_samples.push(this.smid)
+                        update_selected_samples('add',this.smid)
                     }
                     this.element.classList.add('selected-sample');
                 } else {
                     
                     if (sample_index>-1) {
-                        selected_samples.splice(sample_index,1);
+                        update_selected_samples('remove',this.smid);
                     }
                     this.element.classList.remove('selected-sample');
                 }
@@ -375,15 +394,21 @@ class Sample {
         })
         
     }
+    add_assay(id) {
+        console.log('adding assay',id)
+        const wf = id;
+        const assay_id = workflows[wf]
+        const assay = assays[assay_id]
+        console.log(wf,assay_id,assay)
+
+        const assay_str=`${assay.assay_name} v${assay.version_major}.${assay.version_minor}`;
+        const sampleassay = document.createElement('sampleassay');
+        sampleassay.innerHTML=assay_str;
+        this.assays.push(sampleassay)
+        this.element.appendChild(sampleassay);
+    }
     
 }
-var samples = {}
-for (let sample of default_samples) {
-    samples[sample.smid] = new Sample(sample)
-    const sample_req = document.getElementById('req_'+sample.req)
-    sample_req.appendChild(samples[sample.smid].element)
-}
-
 class Assay {
 	constructor(data) {
 		for (let datum in data) {
@@ -404,7 +429,11 @@ class Assay {
                 const data={"assay":this.assayid, samples:selected_samples}
                 const pyoptions={data,csrf,urlprefix:'..',url:'add_to_assay',submit_mode:'silent'}
                 pylims_post(pyoptions).then(result => {
-                    
+                    for (let sample of result.samples) {
+                        samples[sample].add_assay(result.assay)
+                        samples[sample].classList.remove('selected-sample')
+                        update_selected_samples('remove',sample)
+                    }
                     
                 }).catch(error => {
                     console.error(error);
@@ -414,6 +443,33 @@ class Assay {
         })
     }
 }
+var assays = {}
+var workflows = {}
+for (const assay of velocity_assays) {
+    assays[assay.assayid] = new Assay(assay)
+    active_assays.appendChild(assays[assay.assayid].element)
+    workflows[assay.active_workflow]=assay.assayid;
+}
+
+var samples = {}
+for (let sample of default_samples) {
+    console.log(sample)
+    // each sample may have more than one row due to added assays
+    if (!samples[sample.smid]) {
+        console.log('add sample')
+        samples[sample.smid] = new Sample(sample)
+        const sample_req = document.getElementById('req_'+sample.req)
+        sample_req.appendChild(samples[sample.smid].element)
+        if (sample.did) {
+            samples[sample.smid].add_assay(sample.derivative_wf)
+        }
+    } else {
+        console.log('attach assay instead')
+        samples[sample.smid].add_assay(sample.derivative_wf)
+    }
+}
+
+
 document.addEventListener('mousemove',(event)=> {
     if (dragging===2) {
         event.preventDefault();
@@ -423,11 +479,7 @@ document.addEventListener('mousemove',(event)=> {
     }
 })
 
-var assays = {}
-for (const assay of velocity_assays) {
-    assays[assay.assayid] = new Assay(assay)
-    active_assays.appendChild(assays[assay.assayid].element)
-}
+
 
 function localerror(msg) {
 	error_element = document.getElementById('pylims_request_error');

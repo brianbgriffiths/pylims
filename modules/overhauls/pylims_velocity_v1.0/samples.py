@@ -50,7 +50,6 @@ def display_samples(request):
     if not 'userid' in request.session:
         return redirect('/modules/login')
 
-    print(f'Loading in-progress for {request.session['userid']}')
     
     conn = psycopg.connect(dbname=pylims.dbname, user=pylims.dbuser, password=pylims.dbpass, host=pylims.dbhost, port=pylims.dbport, row_factory=dict_row)
     cursor = conn.cursor()
@@ -62,10 +61,11 @@ def display_samples(request):
     
 
     reqids = [x['reqid'] for x in temp_last_projects]
-    print(reqids)
+    # print(len(reqids),'reqids:',reqids)
 
-    cursor.execute('SELECT * FROM velocity.samples WHERE req = ANY(%s)', (reqids,))
+    cursor.execute('SELECT * FROM velocity.samples vs LEFT JOIN velocity.derivatives vd ON vd.sample = vs.smid AND vd.derivative_step is null WHERE vs.req = ANY(%s)', (reqids,))
     response['samples']=json.dumps(cursor.fetchall())
+    print('loaded',len(json.loads(response['samples'])),'samples')
 
     cursor.execute("SELECT * FROM velocity.assay JOIN velocity.workflows ON wfid = active_workflow")
     temp_assays = cursor.fetchall()
@@ -128,7 +128,7 @@ def add_to_assay(request):
     response={}
     response['samples_added'] = len(samples_to_add)
     response['samples']=samples_to_add
-    response['assay'] = assay['assayid']
+    response['assay'] = assay['active_workflow']
     response['status']='success'
     conn.close()
     return JsonResponse(response)

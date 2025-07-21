@@ -85,7 +85,7 @@ for (let page of step_config.pages) {
   }
   
 const abort_button = document.createElement('pagebutton');
-abort_button.textContent = 'Abort Step';
+abort_button.textContent = 'Discard Step';
 abort_button.id="abort-button";
 pagebuttons.appendChild(abort_button);
 
@@ -95,9 +95,22 @@ save_button.id="save-button";
 pagebuttons.appendChild(save_button);
 
 const next_button = document.createElement('pagebutton');
-next_button.textContent = 'Next Step';
+next_button.textContent = 'Next Page';
 next_button.id="next-button";
 pagebuttons.appendChild(next_button);
+
+abort_button.addEventListener('click',()=> {
+  const data={"step":step_config.stepid}
+  const pyoptions={data,csrf,urlprefix:'..',url:'step/discard',submit_mode:'silent'}
+  pylims_post(pyoptions).then(result => {
+      if (result.status=='success') {
+        window.location.href=`/reserved/${step_config.step_type}`;
+      }
+      
+  }).catch(error => {
+      console.error(error);
+  }); 
+})
 </script>
 
 {% block javascript %}

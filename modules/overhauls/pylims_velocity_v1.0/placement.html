@@ -236,17 +236,16 @@
         padding:3px 0px;
         }
       samplenumber {
-        width:50px;
+        width:80px;
         box-sizing:border-box;
         display:inline-block;
+        text-align:center;
       }
-      samplenumber::before {
-        counter-increment: sample; 
-        content: counter(sample) ". "; 
+      samplenumber::after {
+        content:'.';
       }
-      
 
-      #tableheader {
+      .tableheader {
         border:solid 1px #000000;
         border-radius:3px;
         font-size:12px;
@@ -256,6 +255,7 @@
         background-color:var(--gray-light);
         display:block;
         position:relative;
+        cursor:pointer;
       }
       headercontent {
         line-height:20px;
@@ -265,6 +265,8 @@
         vertical-align:top;
         text-align:center;
         box-sizing:border-box;
+        position:relative;
+        
       }
       headerhandle {
         height:20px;
@@ -373,29 +375,24 @@
         
       }
 
-      container {
-        display:inline-block;
-        width:100%;
-        max-height:calc(360px + 80px);
-        position:relative;
-        background-color:white;
-      }
+      
       containertitlebar {
         display:block;
         background-color:var(--accent1);
         padding:5px;
-        height:30px;
+        min-height:30px;
         box-sizing:border-box;
         text-align:left;
       }
       containername {
         color:white;
         font-weight:bold;
+        margin-right:10px;
       }
       .containerborder {
         padding-left: 50px;
         padding-top: 50px;
-        padding-right: 5px;
+        padding-right: 25px;
         padding-bottom: 5px;
         max-width:440px;
         margin:auto;
@@ -445,6 +442,7 @@
         color:var(--gray-dark);
         text-shadow: 1px 1px 4px white;
         font-size:100%;
+        user-select:none;
       }
       vmarker {
         position:absolute;
@@ -461,6 +459,7 @@
         color: var(--gray-dark);
         text-shadow: 1px 1px 4px white;
         container-type: inline-size;
+        user-select:none;
       }
       
       @container (max-width: 20px) {
@@ -549,6 +548,74 @@
         background-color:var(--pink-med);
         cursor:not-allowed;
      }
+     outputcontainer {
+      display:block;
+      position:relative;
+      width: 100%;
+      height: calc(360px + 80px);
+      overflow:hidden;
+     }
+     container {
+      display:inline-block;
+      width:100%;
+      max-height:calc(360px + 80px);
+      position:relative;
+      background-color:white;
+      position:absolute;
+      opacity:1;
+      transition:left .5s, opacity .5s;
+      z-index:1;
+    }
+    #prevcontainer, #nextcontainer {
+      position:absolute;
+      top:50px;
+      background-color:var(--gray-light);
+      height:30px;
+      width:30px;
+      border-radius:10px;
+      z-index:2;
+      display:none;
+      text-align:center;
+      line-height:30px;
+    }
+    #prevcontainer:hover, #nextcontainer:hover {
+      background-color:var(--accent3);
+      cursor:pointer;
+    }
+    #prevcontainer {
+      left:5px;
+      
+    }
+    #nextcontainer {
+      right:5px;
+    }
+    outputsampleinfo, inputsampleinfo {
+      position:relative;
+      display:block;
+    }
+    totaloutputs, totalinputs {
+      position: absolute;
+      right: 10px;
+      display: block;
+      top: 7px;
+      font-weight: bold;
+    }
+    .sortup::before, .sortdown::before {
+      font-family: "Font Awesome 6 Pro";
+      position:absolute;
+      top:0px;
+      left:2px;
+      font-size: 12px;
+      color: var(--accent1);
+    }
+    .sortdown::before {
+      content: "\f884";
+    }
+    .sortup::before {
+      content: "\f161";
+    }
+
+    
 
 
 
@@ -557,21 +624,25 @@
 {% endblock %}
 {% block centercontent %}
 <div style="padding:0px 50px;text-align:left;">
-    <breadcrumbs> {{ config.protocol_name }} / Step # {{config.order_in_protocol}} / <b>{{ config.step_name }}</b></breadcrumbs>
-    <pagelinks><pages></pages><pagebuttons></pagebuttons></pagelinks>
+  
     <containerview>
         <inputs>
             <sectiontitle>Input Samples</sectiontitle>
             <inputcontainer></inputcontainer>
-            <inputsampleinfo><selectedsamples>0 Selected</selectedsamples></inputsampleinfo>
+            <inputsampleinfo><selectedsamples>0 Selected</selectedsamples><totalinputs>(0 Total)</totalinputs></inputsampleinfo>
+            <div id="inputheaders" class="tableheader">
+              <headercontent style="width:80px;" data-sort="scanorder">Scan #</headercontent><headerhandle></headerhandle>
+              <headercontent style="width:200px;" data-sort="sample_name">Sample</headercontent><headerhandle></headerhandle>
+              <headercontent data-sort="well">Well</headercontent><headerhandle></headerhandle>
+          </div>
             <inputsamples></inputsamples>
         </inputs>
         <outputs>
             <sectiontitle>Output Samples</sectiontitle>
-            <outputcontainer></outputcontainer>
-            <outputsampleinfo><placedsamples>0 Placed</placedsamples></outputsampleinfo>
-            <div id="tableheader" style="">
-                <headercontent style="width:50px;">#</headercontent><headerhandle></headerhandle>
+            <outputcontainer><div id="prevcontainer"><i class="fa-solid fa-chevron-left"></i></div><div id="nextcontainer"><i class="fa-solid fa-chevron-right"></i></div></outputcontainer>
+            <outputsampleinfo><placedsamples>0 Placed</placedsamples><totaloutputs>(0 Total)</totaloutputs></outputsampleinfo>
+            <div id="outputheaders" class="tableheader">
+                <headercontent style="width:50px;">Added #</headercontent><headerhandle></headerhandle>
                 <headercontent style="width:200px;">Sample</headercontent><headerhandle></headerhandle>
                 <headercontent>Well</headercontent><headerhandle></headerhandle>
             </div>
@@ -612,7 +683,98 @@ function localerror(msg) {
 }
 const rownames=['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P'];
 
+var view_container=0;
+var container_keys = []
+const prevcontainer = document.getElementById('prevcontainer');
+prevcontainer.addEventListener('click',()=>{
+  const num_containers = Object.keys(containers).length;
+  console.log('current view container',view_container)
+  if (view_container==0) {
+    console.error('no more prev container. should have been hidden')
+    return false
+  }
+  const old_container = containers[container_keys[view_container]];
+  view_container-=1;
+  const prev_container = container_keys[view_container];
+  const new_container = containers[prev_container];
+  old_container.element.style.left=`${old_container.element.clientWidth}px`;
+  new_container.element.style.left='0px';
+  placedsamples.innerHTML=`${new_container.placements.filter(el => el !== null).length} / ${new_container.rows*new_container.columns}`;
+  console.log('loading container',view_container, prev_container)
+  if (view_container < num_containers) {
+    nextcontainer.style.display='block';
+  }
+  if (view_container==0) {
+    prevcontainer.style.display='none';
+  }
+  output_sample_display()
+})
+const nextcontainer = document.getElementById('nextcontainer');
+nextcontainer.addEventListener('click',()=>{
+  console.log('current view container',view_container)
+  if (!container_keys[view_container]) {
+    console.error('no more next container. should have been hidden')
+    return false
+  }
+  const num_containers = Object.keys(containers).length;
+  const old_container = containers[container_keys[view_container]];
+  view_container+=1
+  const next_container = container_keys[view_container]
+  const new_container = containers[next_container];
+  const newleft=
+  old_container.element.style.left=`-${old_container.element.clientWidth}px`;
+  new_container.element.style.left='0px';
+  placedsamples.innerHTML=`${new_container.placements.filter(el => el !== null).length} / ${new_container.rows*new_container.columns}`;
+  console.log('loading container',view_container,next_container)
+  if (view_container+1 == num_containers) {
+    nextcontainer.style.display='none';
+  }
+  if (view_container>0) {
+    prevcontainer.style.display='block';
+  }
+  output_sample_display()
+})
 
+const inputheaders = document.getElementById('inputheaders')
+const inputsorters = inputheaders.querySelectorAll('headercontent');
+for (const sorter of inputsorters) {
+  if (sorter.dataset.sort!='none') {
+    sorter.addEventListener('click',()=>{
+      console.log('sorting by',sorter.dataset.sort)
+      toggle_sort_icon(sorter);
+      const by = sorter.dataset.sort;
+      inputsamples.innerHTML = '';
+      var sortedSamples = Object.values(samples).sort((a, b) => 
+          a[by] > b[by] ? 1 : a[by] < b[by] ? -1 : 0
+      );
+      if (sorter.classList.contains('sortup')) {
+        sortedSamples.reverse()
+      } 
+      console.log(sortedSamples[0][by])
+      sortedSamples.forEach(sample => {
+          if (!outputsamples.contains(sample.element)) {
+              inputsamples.appendChild(sample.element);
+          }
+      });
+    })
+  }
+}
+
+function toggle_sort_icon(element) {
+  if (element.classList.contains('sortdown')) {
+    element.classList.add('sortup');
+    element.classList.remove('sortdown');
+  } else {
+    element.classList.add('sortdown');
+    element.classList.remove('sortup');
+  }
+  const siblings = [...element.parentNode.children].filter(el => el !== element);
+  for (const sibling of siblings) {
+    sibling.classList.remove('sortdown');
+    sibling.classList.remove('sortup');
+  }
+  
+}
 
 class Container {
 	constructor(data) {
@@ -620,12 +782,19 @@ class Container {
 			this[datum] = data[datum]
 		}
 		this.element = document.createElement('container');
+    this.container_number = Object.keys(containers).length;
+    container_keys.push(this.conid)
 
         this.titlebar = document.createElement('containertitlebar');
         this.element.appendChild(this.titlebar);
 
-        this.containername = document.createElement('containername');
-        this.containername.textContent=this.type_name;
+        this.containertype = document.createElement('containername');
+        this.containertype.textContent=this.type_name;
+        this.titlebar.appendChild(this.containertype);
+
+        this.containername = document.createElement('input')
+        this.containername.type='text'
+        this.containername.value=this.container_name || `c-${this.conid}`;
         this.titlebar.appendChild(this.containername);
 
         this.columnlabels = document.createElement('columnlabels');
@@ -650,7 +819,7 @@ class Container {
             rmarker.style.top=`${(i/this.rows)*100}%`;
             //this.gridcontainer.appendChild(rmarker);
         }
-        placedsamples.innerHTML = `${this.placements.length} Placed`;
+        //placedsamples.innerHTML=`${this.placements.filter(el => el !== null).length} / ${this.rows*this.columns}`;
         for (let i = 0; i < this.rows * this.columns; i++) {
             this.wells.push(document.createElement('div'));
             this.wells[i].className = 'grid-item';
@@ -731,12 +900,14 @@ class Container {
                     }
                     selected_samples=[];
                     selectedsamples.textContent = `${selected_samples.length} Selected`;
-                    placedsamples.textContent = `${placed_samples.length} Placed`;
+                    placedsamples.innerHTML=`${placed_samples.filter(el => el !== null).length} / ${this.container.rows*this.container.columns}`;
                     if (placed_samples.length==velocity_step_io.length) {
                         console.log('all placed');
                         next_button.classList.add('next-button-active');
                     }
                 }
+                output_sample_display();
+                input_sample_display();
             })
         }
         this.footerbar = document.createElement('containertitlebar');
@@ -774,6 +945,52 @@ class Container {
             placedsamples.textContent = `${this.placements.length} Placed`;
         })
 
+        this.newcontainer.addEventListener('click',()=>{
+          const data={"step":step_config.stepid,"type": this.cid}
+          const pyoptions={data,csrf,urlprefix:'..',url:'step/addcontainer',submit_mode:'silent'}
+          pylims_post(pyoptions).then(result => {
+              if (result.status=='success') {
+                view_container = container_keys.length;
+                containers[result.containerid]=new Container(JSON.parse(result.container));
+                outputcontainer.appendChild(containers[result.containerid].element);
+                containers[result.containerid].element.style.left=`${containers[result.containerid].element.clientWidth}px`;
+                containerdisplay();
+                
+              }
+              
+          }).catch(error => {
+              console.error(error);
+          }); 
+          return false;
+        })
+        this.deletecontainer.addEventListener('click',()=>{
+          if (container_keys.length==1) {
+            alert("You can't delete the only remaining container in a step.");
+            return false;
+          }
+          const data={"step":step_config.stepid,"conid": this.conid}
+          const pyoptions={data,csrf,urlprefix:'..',url:'step/deletecontainer',submit_mode:'silent'}
+          pylims_post(pyoptions).then(result => {
+              if (result.status=='success') {
+                view_container=containers[result.containerid].container_number-1;
+                containers[result.containerid].element.style.opacity=0;
+                setTimeout(()=> {
+                    containers[result.containerid].element.remove();
+                    delete containers[result.containerid];
+                    const key_index = container_keys.indexOf(result.containerid);
+                    container_keys.splice(key_index, 1);
+                    containerdisplay();
+                    input_sample_display();
+
+                },500)
+              }
+              
+          }).catch(error => {
+              console.error(error);
+          }); 
+          return false;
+        })
+
     }
     index_to_grid(index) {
         const row_index = index % this.rows;
@@ -804,12 +1021,77 @@ function reset_potential_drops() {
 }
 
 var containers = {}
+
 for (let container of velocity_containers) {
     containers[container.conid]=new Container(container);
+    outputcontainer.appendChild(containers[container.conid].element);
 }
 
+function output_sample_display() {
+  const placed_outputs = outputsamples.querySelectorAll('inputsample')
+  console.log('adjust output samples shown',placed_outputs.length)
+  const current_container = container_keys[view_container]
+  for (const placed_output of placed_outputs) {
+    const op_container = samples[placed_output.dataset.did].outputcontainer
+    if (op_container == current_container) {
+      samples[placed_output.dataset.did].element.style.display='block';
+    } else if (container_keys.indexOf(op_container)==-1) { 
+      //this was deleted and we need to remove it from the lightest
+      samples[placed_output.dataset.did].element.style.display='block';
+      inputsamples.appendChild(samples[placed_output.dataset.did].element);
+    } else {
+      samples[placed_output.dataset.did].element.style.display='none';
+    }
+  }
+  const new_placed_outputs = outputsamples.querySelectorAll('inputsample')
+  const total_outputs = document.querySelector('totaloutputs');
+  total_outputs.innerHTML = `(${new_placed_outputs.length} Total)`;
+}
+
+function input_sample_display() {
+  const input_samples = inputsamples.querySelectorAll('inputsample');
+  const total_inputs = document.querySelector('totalinputs');
+  total_inputs.innerHTML = `(${input_samples.length} Total)`;
+}
+
+function containerdisplay() {
+  const num_containers = container_keys.length;
+  console.log('numcontainers',num_containers)
+  console.log('view_container',view_container)
+  if (num_containers > 0 && view_container < num_containers-1) {
+    nextcontainer.style.display='block';
+  } else {
+    nextcontainer.style.display='none';
+  }
+  if (num_containers > 0 && view_container > 0) {
+    prevcontainer.style.display='block';
+  } else {
+    prevcontainer.style.display='none';
+  }
+  for (let i in container_keys) {
+      const container=containers[container_keys[i]];
+      if (view_container < i) {
+        const newleft=`${container.element.clientWidth}px`;
+        console.log('setting newleft',container_keys[i],newleft)
+        container.element.style.left=newleft;
+      } else if (view_container > i) {
+        const newleft=`-${container.element.clientWidth}px`;
+        console.log('setting newleft',container_keys[i],newleft)
+        container.element.style.left=newleft;
+      } else {
+        console.log('setting container to view',container_keys[i])
+        container.element.style.left='0px';
+        placedsamples.innerHTML=`${container.placements.filter(el => el !== null).length} / ${container.rows*container.columns}`;
+      }
+  }
+  output_sample_display()
+  
+}
+
+
+
 for (let container of outputcontainers) {
-    outputcontainer.appendChild(containers[container].element);
+    //outputcontainer.appendChild(containers[container].element);
 }
 
 
@@ -918,6 +1200,8 @@ class Sample {
 		}
 		this.element = document.createElement('inputsample');
         this.number = document.createElement('samplenumber');
+        this.scanorder = Object.keys(samples).length;
+        this.number.textContent = this.scanorder+1;
         this.element.appendChild(this.number);
         this.did = this.output_id;
         this.element.dataset.did=this.output_id;
@@ -936,7 +1220,7 @@ class Sample {
         this.placed_index = this.output_placement_index;
         this.selected = false;
 
-        console.log('creating sample',data)
+        //console.log('creating sample',data)
 
         // figure out placement stuff
         //if (this.rdid !== null) {
@@ -1000,6 +1284,8 @@ for (let io of velocity_step_io) {
       outputsamples.appendChild(samples[io.output_id].element)
     }
 }
+containerdisplay();
+input_sample_display();
 
 
 document.addEventListener('mousemove',(event)=> {
